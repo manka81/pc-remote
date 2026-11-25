@@ -104,7 +104,9 @@
 
     async function checkTunnelAndRedirect() {
       try {
-        const res = await fetch(`https://ntfy.sh/${TOPIC}/raw?poll=1&since=all`);
+        const res = await fetch(`https://ntfy.sh/${TOPIC}/raw?poll=1&since=all&t=${Date.now()}`, {
+          cache: 'no-store'
+        });
         if (!res.ok) throw new Error('HTTP ' + res.status);
 
         const text = await res.text();
@@ -120,6 +122,22 @@
         }
 
         if (targetUrl) {
+          // Verify tunnel is actually alive via /api/ping before redirecting
+          try {
+            const parsed = new URL(targetUrl);
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 3000);
+            const pingRes = await fetch(`${parsed.origin}/api/ping?t=${Date.now()}`, {
+              signal: ctrl.signal,
+              cache: 'no-store'
+            });
+            clearTimeout(timer);
+            if (!pingRes.ok) throw new Error('Tunnel offline');
+          } catch (pingErr) {
+            showWaitingState();
+            return false;
+          }
+
           document.getElementById('status-badge').textContent = 'ПК найден!';
           document.getElementById('status-badge').style.borderColor = 'var(--success)';
           document.getElementById('status-badge').style.color = 'var(--success)';
